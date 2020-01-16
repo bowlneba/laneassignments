@@ -8,6 +8,7 @@ namespace LaneAssignments
         private static int _teams;
         private static int _games;
         private static int _teamsPerPair;
+        private static bool _allowDuplicateLane;
 
         static void Main(string[] args)
         {
@@ -20,18 +21,22 @@ namespace LaneAssignments
             Console.Write("Enter Number of Teams per Pair: ");
             var teamsPerPair = Console.ReadLine();
 
+            Console.Write("Allow Duplicate Lane Assignments (Y): ");
+            var allowDuplicateLane = Console.ReadLine();
+
             System.IO.Directory.CreateDirectory("results");
 
-            DynamicGames(Convert.ToInt32(teams),Convert.ToInt32(games),Convert.ToInt32(teamsPerPair));
+            DynamicGames(Convert.ToInt32(teams),Convert.ToInt32(games),Convert.ToInt32(teamsPerPair), allowDuplicateLane.ToUpper() == "Y");
         }
 
-        private static void DynamicGames(int teams, int games, int teamsPerPair)
+        private static void DynamicGames(int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
         {
             _teams = teams;
             _games = games;
             _teamsPerPair = teamsPerPair;
+            _allowDuplicateLane = allowDuplicateLanes;
 
-            var generator = new Functionality.GameGeneratorDynamic(PushTries, teams, games,teamsPerPair);
+            var generator = new Functionality.GameGeneratorDynamic(PushTries, teams, games,teamsPerPair,allowDuplicateLanes);
             generator.Generate(WriteGame);
 
             var x = new System.Text.StringBuilder();
@@ -41,14 +46,14 @@ namespace LaneAssignments
 
             System.IO.Directory.CreateDirectory("results//complete");
 
-            System.IO.File.WriteAllText($"results//complete//teams{_teams}_games{_games}_perPair{_teamsPerPair}_{Guid.NewGuid()}.txt", x.ToString());
+            System.IO.File.WriteAllText($"results//complete//teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", x.ToString());
         }
 
         private static void WriteGame(Game game)
         {
             var gameTxt = DumpGame(game);
             Console.WriteLine(gameTxt);
-            System.IO.File.WriteAllText($"results//game{game.Number}_teams{_teams}_games{_games}_perPair{_teamsPerPair}_{Guid.NewGuid()}.txt", gameTxt);
+            System.IO.File.WriteAllText($"results//game{game.Number}_teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", gameTxt);
         }
 
         private static string DumpGame(Game game)
@@ -75,7 +80,7 @@ namespace LaneAssignments
             return x.ToString();
         }
 
-        private static void PushTries(int gameNumber, int tries)
+        private static void PushTries(int gameNumber, ulong tries)
             => Console.WriteLine($"Game {gameNumber} Attempts: {tries:n0}");
     }
 }
