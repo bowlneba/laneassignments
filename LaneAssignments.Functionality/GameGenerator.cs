@@ -8,9 +8,9 @@ namespace LaneAssignments.Functionality
 {
     public class GameGenerator
     {
-        private readonly Action<int,int> _pushTries;
+        private readonly Action<int,ulong> _pushTries;
 
-        public GameGenerator(Action<int,int> pushTries)
+        public GameGenerator(Action<int,ulong> pushTries)
         {
             _pushTries = pushTries;
         }
@@ -77,7 +77,7 @@ namespace LaneAssignments.Functionality
 
             var lanes = new List<Lane>();
 
-            var tries = 0;
+            ulong tries = 0;
 
             do
             {

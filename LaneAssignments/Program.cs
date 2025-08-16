@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace LaneAssignments
@@ -9,6 +10,8 @@ namespace LaneAssignments
         private static int _games;
         private static int _teamsPerPair;
         private static bool _allowDuplicateLane;
+
+        private static List<Guid> _guids = [];
 
         static void Main(string[] args)
         {
@@ -31,29 +34,60 @@ namespace LaneAssignments
 
         private static void DynamicGames(int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
         {
-            _teams = teams;
-            _games = games;
-            _teamsPerPair = teamsPerPair;
-            _allowDuplicateLane = allowDuplicateLanes;
+            var success = false;
+            
+            // shell of a do while not success
+            do
+            {
+                _teams = teams;
+                _games = games;
+                _teamsPerPair = teamsPerPair;
+                _allowDuplicateLane = allowDuplicateLanes;
 
-            var generator = new Functionality.GameGeneratorDynamic(PushTries, teams, games,teamsPerPair,allowDuplicateLanes);
-            generator.Generate(WriteGame);
+                var generator = new Functionality.GameGeneratorDynamic(PushTries, teams, games,teamsPerPair,allowDuplicateLanes);
+                var generated = generator.Generate(WriteGame);
 
-            var x = new System.Text.StringBuilder();
+                if (generated)
+                {
+                    success = true;
+                    Console.WriteLine("All games generated successfully");
+                    
+                    var x = new System.Text.StringBuilder();
 
-            foreach (var game in generator.Games)
-                x.AppendLine(DumpGame(game));
+                    foreach (var game in generator.Games)
+                    {
+                        x.AppendLine(DumpGame(game));
+                    }
 
-            System.IO.Directory.CreateDirectory("results//complete");
+                    System.IO.Directory.CreateDirectory("results//complete");
 
-            System.IO.File.WriteAllText($"results//complete//teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", x.ToString());
+                    System.IO.File.WriteAllText($"results//complete//teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", x.ToString());
+                }
+                else
+                {
+                    foreach (var guid in _guids)
+                    {
+                        var file = System.IO.Directory.GetFiles("results", $"*{guid}*.txt");
+                        foreach (var f in file)
+                        {
+                            System.IO.File.Delete(f);
+                        }
+                    }
+                }
+            } while (!success);
+
+            
         }
 
         private static void WriteGame(Game game)
         {
             var gameTxt = DumpGame(game);
             Console.WriteLine(gameTxt);
-            System.IO.File.WriteAllText($"results//game{game.Number}_teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", gameTxt);
+            
+            var guid = Guid.NewGuid();
+            _guids.Add(guid);
+            
+            System.IO.File.WriteAllText($"results//game{game.Number}_teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{guid}.txt", gameTxt);
         }
 
         private static string DumpGame(Game game)

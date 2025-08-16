@@ -12,9 +12,9 @@ namespace LaneAssignments
 
         public List<Lane> LaneAssignments { get; set; }
 
-        public int Tries { get; set; }
+        public ulong Tries { get; set; }
 
-        public Game(int number, int tries, params Lane[] lanes)
+        public Game(int number, ulong tries, params Lane[] lanes)
         {
             Number = number;
             Tries = tries;

@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace LaneAssignments.Functionality
 {
@@ -31,14 +29,24 @@ namespace LaneAssignments.Functionality
             _games = new List<Game>();
         }
 
-        public void Generate(Action<Game> dumpGame)
+        public bool Generate(Action<Game> dumpGame)
         {
             for (var i = 1; i <= _gameCount; i++)
             {
                 var game = GenerateGame(i, _games.ToArray());
+
+                if (game == null) // failed to generate a game
+                {
+                    _games.Clear();
+                    
+                    return false;
+                }
+
                 _games.Add(game);
                 dumpGame(game);
             }
+            
+            return true;
         }
 
         private Game GenerateGame(int gameNumber, params Game[] previousGames)
@@ -47,24 +55,22 @@ namespace LaneAssignments.Functionality
 
             var lanes = new List<Lane>();
 
-            var tries = 0;
-            var billionTries = 0;
+            ulong tries = 0;
 
-            bool publish = true;
+            var publish = true;
 
             do
             {
-                tries++;
-
-                if (tries == 1000000000)
+                if (tries++ == 1_000_000)
                 {
-                    billionTries++;
-                    tries = 0;
+                    Console.WriteLine("Resetting after 1,000,000 tries");
+
+                    return null;
                 }
 
                 if (DateTime.Now.Second % 10 == 0 && publish)
                 {
-                    _pushTries(gameNumber, Convert.ToUInt64(billionTries * 1000000000) + Convert.ToUInt64(tries));
+                    _pushTries(gameNumber, tries);
                     publish = false;
                 }
                 else if (DateTime.Now.Second % 10 == 1)
@@ -77,8 +83,9 @@ namespace LaneAssignments.Functionality
                 var teams = RandomizeTeamOrder().ToList();
 
                 for (var i = 1; i <= _teams / _teamsPerPair; i++)
+                {
                     lanes.Add(new Lane(i));
-                
+                }
 
                 foreach (var team in teams)
                 {
