@@ -35,6 +35,7 @@ namespace LaneAssignments
         private static void DynamicGames(int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
         {
             var success = false;
+            var resetCount = 0;
             
             // shell of a do while not success
             do
@@ -65,6 +66,9 @@ namespace LaneAssignments
                 }
                 else
                 {
+                    resetCount++;
+                    Console.WriteLine($"Resetting all games and starting over - {resetCount}");
+                    
                     foreach (var guid in _guids)
                     {
                         var file = System.IO.Directory.GetFiles("results", $"*{guid}*.txt");
