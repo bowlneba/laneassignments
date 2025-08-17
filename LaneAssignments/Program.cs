@@ -73,14 +73,14 @@ class Program
             {
                 resetCount++;
                 Console.WriteLine($"Resetting all games and starting over - {resetCount}");
-                    
-                foreach (var guid in Guids)
+            }
+            
+            foreach (var guid in Guids)
+            {
+                var files = System.IO.Directory.GetFiles("results", $"*{guid}*.txt");
+                foreach (var file in files)
                 {
-                    var file = System.IO.Directory.GetFiles("results", $"*{guid}*.txt");
-                    foreach (var f in file)
-                    {
-                        System.IO.File.Delete(f);
-                    }
+                    System.IO.File.Delete(file);
                 }
             }
         } while (!success);
