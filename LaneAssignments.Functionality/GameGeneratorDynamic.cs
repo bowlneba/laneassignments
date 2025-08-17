@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace LaneAssignments.Functionality
 {
     public class GameGeneratorDynamic
     {
-        private readonly Action<int, ulong> _pushTries;
+        private readonly Action<int, ulong, long> _pushTries;
         private readonly int _teams;
         private readonly int _gameCount;
         private readonly int _teamsPerPair;
@@ -15,7 +16,7 @@ namespace LaneAssignments.Functionality
         private readonly IList<Game> _games;
         public IEnumerable<Game> Games => _games;
 
-        public GameGeneratorDynamic(Action<int,ulong> pushTries, int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
+        public GameGeneratorDynamic(Action<int,ulong, long> pushTries, int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
         {
             _pushTries = pushTries;
             _teams = teams;
@@ -56,8 +57,8 @@ namespace LaneAssignments.Functionality
             var lanes = new List<Lane>();
 
             ulong tries = 0;
-
-            var publish = true;
+            
+            var timing = Stopwatch.StartNew();
 
             do
             {
@@ -68,14 +69,10 @@ namespace LaneAssignments.Functionality
                     return null;
                 }
 
-                if (DateTime.Now.Second % 10 == 0 && publish)
+                if (tries % 10_000 == 0)
                 {
-                    _pushTries(gameNumber, tries);
-                    publish = false;
-                }
-                else if (DateTime.Now.Second % 10 == 1)
-                {
-                    publish = true;
+                    _pushTries(gameNumber, tries, timing.ElapsedMilliseconds);
+                    timing.Restart();
                 }
 
                 differentLanesAndPairings = true;
