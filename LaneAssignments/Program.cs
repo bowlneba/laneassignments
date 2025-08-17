@@ -29,6 +29,13 @@ _allowDuplicateLane = string.Equals(Console.ReadLine(), "Y", StringComparison.Or
 Console.Write("Check Possibility Only (Y): ");
 _checkPossibilityOnly = string.Equals(Console.ReadLine(), "Y", StringComparison.OrdinalIgnoreCase);
 
+var bruteForce = false;
+if (!_checkPossibilityOnly)
+{
+    Console.Write("Brute Force (Y): ");
+    bruteForce = string.Equals(Console.ReadLine(), "Y", StringComparison.OrdinalIgnoreCase);
+}
+
 System.IO.Directory.CreateDirectory("results");
 
 var diagnosticResult = CheckCombinations(_teams, _games, _teamsPerPair, _allowDuplicateLane);
@@ -42,26 +49,37 @@ else if (!_checkPossibilityOnly)
 {
     Console.WriteLine("Schedule is possible:");
     Console.WriteLine(diagnosticResult);
+
+    if (bruteForce)
+    {
+        var stopWatch = Stopwatch.StartNew();
+        var result = _allowDuplicateLane
+            ? Scheduler.BuildScheduleWithDuplicatesAllowed(_teams, _games, _teamsPerPair)
+            : Scheduler.BuildScheduleWithNoDuplicates(_teams, _games, _teamsPerPair, true);
+        stopWatch.Stop();
     
-    await DynamicGames(
-        _teams,
-        _games,
-        _teamsPerPair,
-        _allowDuplicateLane);
+        Console.WriteLine("Schedule generated successfully");
+        Console.WriteLine($"Total Time Elapsed: {stopWatch.Elapsed}");
+        
+        var x = new System.Text.StringBuilder();
+        foreach (var game in result)
+        {
+            x.AppendLine(DumpGameBrute(game));
+        }
+        System.IO.Directory.CreateDirectory("results/complete");
+        await System.IO.File.WriteAllTextAsync($"results/complete/teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", x.ToString());
+        
+    }
+    else
+    {
+        await DynamicGames(
+            _teams,
+            _games,
+            _teamsPerPair,
+            _allowDuplicateLane);
+    }
+
     
-    // var result = _allowDuplicateLane
-    //     ? Scheduler.BuildScheduleWithDuplicatesAllowed(_teams, _games, _teamsPerPair)
-    //     : Scheduler.BuildScheduleWithNoDuplicates(_teams, _games, _teamsPerPair, true);
-    //
-    // Console.WriteLine("Schedule generated successfully:");
-    // foreach (var game in result)
-    // {
-    //     Console.WriteLine($"Game {game.Key}:");
-    //     foreach (var match in game.Value)
-    //     {
-    //         Console.WriteLine(match);
-    //     }
-    // }
 }
 else
 {
@@ -85,8 +103,9 @@ ScheduleDiagnosticResult NoDuplicateLanesCheck(int teams, int games, int teamsPe
         TeamsPerPair = teamsPerLane
     };
 
-    // Step 1: Total lanes needed per game
-    var lanesPerGame = teams / teamsPerLane;
+    // Step 1: Lanes per game should be max of (teams/teamsPerLane) and games
+    var baseLanesPerGame = teams / teamsPerLane;
+    var lanesPerGame = Math.Max(baseLanesPerGame, games);
     result.LanesPerGame = lanesPerGame;
 
     // Step 2: Total matches (one per lane per game)
@@ -249,6 +268,34 @@ string DumpGame(Game game)
     foreach (var lane in game.LaneAssignments)
     {
         x.Append($"Lane {lane.Number}: ");
+        if (lane.Teams.Count == 0)
+        {
+            x.Append("(empty)");
+        }
+        else
+        {
+            for (var i = 0; i < lane.Teams.Count; i++)
+            {
+                x.Append(lane.Teams[i]);
+                if (i < lane.Teams.Count - 1)
+                {
+                    x.Append(" / ");
+                }
+            }
+        }
+        x.AppendLine();
+    }
+    return x.ToString();
+}
+
+string DumpGameBrute(KeyValuePair<int, List<Match>> game)
+{
+    var x = new System.Text.StringBuilder();
+    
+    x.AppendLine($"Game {game.Key}");
+    foreach (var lane in game.Value)
+    {
+        x.Append($"Lane {lane.LaneNumber}: ");
         for (var i = 0; i < _teamsPerPair; i++)
         {
             x.Append(lane.Teams[i]);

@@ -31,9 +31,6 @@ public class GameGeneratorDynamic2
         _teamsPerLane = teamsPerLane;
         _allowDuplicateLane = allowDuplicateLanes;
 
-        if (_gameCount > _teams / (allowDuplicateLanes ? 1 : _teamsPerLane))
-            throw new InvalidOperationException("More games than lanes available");
-
         _games = new List<Game>();
         _opponentHistory = new Dictionary<int, HashSet<int>>();
         _laneHistory = new Dictionary<int, HashSet<int>>();
@@ -68,11 +65,30 @@ public class GameGeneratorDynamic2
 
     private Game GenerateGame(int gameNumber)
     {
+        var lanesThisGame = Math.Max(_teams / _teamsPerLane, _gameCount);
+
+        // Build all lanes
         var lanes = new List<Lane>();
-        for (var i = 1; i <= _teams / _teamsPerLane; i++)
+        for (var i = 1; i <= lanesThisGame; i++)
         {
             lanes.Add(new Lane(i));
         }
+
+        // total lanes available
+        var totalLanes = lanesThisGame;
+
+        // how many lanes are actually needed for this game
+        var lanesNeeded = (int)Math.Ceiling((double)_teams / _teamsPerLane);
+
+        // how many empty lanes to assign this game
+        var emptyCount = totalLanes - lanesNeeded;
+
+        // pick empty lanes in a rotating pattern across games
+        var emptyLaneNumbers = Enumerable.Range(0, emptyCount)
+            .Select(offset => ((gameNumber - 1 + offset) % totalLanes) + 1)
+            .ToList();
+
+        var emptyLanes = lanes.Where(l => emptyLaneNumbers.Contains(l.Number)).ToList();
 
         var timing = Stopwatch.StartNew();
         var availableTeams = RandomizeTeamOrder();
@@ -91,11 +107,11 @@ public class GameGeneratorDynamic2
                 timing.Restart();
             }
 
-            var success = AssignTeamsToLanes(availableTeams, lanes);
+            var success = AssignTeamsToLanes(availableTeams, lanes, emptyLanes);
             if (success)
                 return new Game(gameNumber, Tries, lanes.ToArray());
 
-            // reset lanes and reshuffle
+            // reset lanes except the permanent empty one
             foreach (var lane in lanes)
             {
                 lane.Teams.Clear();
@@ -106,12 +122,13 @@ public class GameGeneratorDynamic2
         } while (true);
     }
 
-    private bool AssignTeamsToLanes(List<int> teams, List<Lane> lanes)
+    private bool AssignTeamsToLanes(List<int> teams, List<Lane> lanes, IEnumerable<Lane> emptyLanes)
     {
         foreach (var team in teams)
         {
-            // find candidate lanes for this team
+            // find candidate lanes, excluding the empty lane
             var candidateLanes = lanes
+                .Where(l => !emptyLanes.Contains(l))
                 .Where(l => l.Teams.Count < _teamsPerLane)
                 .Where(l => _allowDuplicateLane || !_laneHistory[team].Contains(l.Number))
                 .Where(l => !l.Teams.Any(other => _opponentHistory[team].Contains(other)))
@@ -122,14 +139,15 @@ public class GameGeneratorDynamic2
 
             // MRV heuristic: prefer lanes with fewer available slots
             var chosenLane = candidateLanes
-                .OrderBy(l => l.Teams.Count) // fill partially used lanes first
-                .ThenBy(_ => RandomNumberGenerator.GetInt32(0, 1000)) // break ties randomly
+                .OrderBy(l => l.Teams.Count)
+                .ThenBy(_ => RandomNumberGenerator.GetInt32(0, 1000))
                 .First();
 
             chosenLane.AddTeam(team);
         }
 
-        return lanes.All(l => l.Teams.Count == _teamsPerLane);
+        // ✅ check only "real" lanes are full
+        return lanes.Where(l => l != emptyLane).All(l => l.Teams.Count == _teamsPerLane);
     }
 
     private void UpdateHistories(Game game)

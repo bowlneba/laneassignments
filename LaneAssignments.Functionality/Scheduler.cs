@@ -58,7 +58,7 @@ public static class Scheduler
         if (AssignLanesRecursive(1, lanesPerGame, teamsPerLane,
                                  remainingTeams, usedTeamsThisGame,
                                  teamLaneHistory, teamOpponentHistory,
-                                 matchesForGame, verbose))
+                                 matchesForGame, currentGame, verbose))
         {
             schedule[currentGame] = matchesForGame;
 
@@ -105,6 +105,7 @@ public static class Scheduler
         Dictionary<int, HashSet<int>> teamLaneHistory,
         Dictionary<int, HashSet<int>> teamOpponentHistory,
         List<Match> matches,
+        int currentGame,
         bool verbose)
     {
         if (currentLane > totalLanes)
@@ -115,7 +116,7 @@ public static class Scheduler
         foreach (var group in Combinations(availableTeams, teamsPerLane))
         {
             if (verbose)
-                Console.WriteLine($"  ➡️ Trying lane {currentLane} with {{{string.Join(",", group)}}}");
+                Console.WriteLine($"Game {currentGame} ➡️ Trying lane {currentLane} with {{{string.Join(",", group)}}}");
 
             if (IsValidGroup(group, currentLane, teamLaneHistory, teamOpponentHistory))
             {
@@ -131,7 +132,7 @@ public static class Scheduler
                 if (AssignLanesRecursive(currentLane + 1, totalLanes, teamsPerLane,
                                          allTeams, usedTeamsThisGame,
                                          teamLaneHistory, teamOpponentHistory,
-                                         matches, verbose))
+                                         matches, currentGame, verbose))
                     return true;
 
                 // Backtrack
