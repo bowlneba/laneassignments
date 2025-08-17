@@ -147,7 +147,7 @@ public class GameGeneratorDynamic2
         }
 
         // ✅ check only "real" lanes are full
-        return lanes.Where(l => l != emptyLane).All(l => l.Teams.Count == _teamsPerLane);
+        return lanes.Where(l => !emptyLanes.Contains(l)).All(l => l.Teams.Count == _teamsPerLane);
     }
 
     private void UpdateHistories(Game game)
