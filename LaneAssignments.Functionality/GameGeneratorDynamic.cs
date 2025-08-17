@@ -2,143 +2,174 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Security.Cryptography;
 
-namespace LaneAssignments.Functionality
+namespace LaneAssignments.Functionality;
+
+public class GameGeneratorDynamic
 {
-    public class GameGeneratorDynamic
+    private readonly Action<int, ulong, TimeSpan> _pushTries;
+    private readonly int _teams;
+    private readonly int _gameCount;
+    private readonly int _teamsPerPair;
+    private readonly bool _allowDuplicateLane;
+
+    private readonly IList<Game> _games;
+    public IEnumerable<Game> Games => _games;
+
+    public GameGeneratorDynamic(Action<int,ulong, TimeSpan> pushTries, int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
     {
-        private readonly Action<int, ulong, long> _pushTries;
-        private readonly int _teams;
-        private readonly int _gameCount;
-        private readonly int _teamsPerPair;
-        private readonly bool _allowDuplicateLane;
+        _pushTries = pushTries;
+        _teams = teams;
+        _gameCount = games;
+        _teamsPerPair = teamsPerPair;
+        _allowDuplicateLane = allowDuplicateLanes;
 
-        private readonly IList<Game> _games;
-        public IEnumerable<Game> Games => _games;
+        if (_gameCount > _teams / (allowDuplicateLanes ? 1 :_teamsPerPair))
+            throw new InvalidOperationException("More games than pairs available");
 
-        public GameGeneratorDynamic(Action<int,ulong, long> pushTries, int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
+        _games = new List<Game>();
+    }
+
+    public bool Generate(Action<Game> dumpGame)
+    {
+        for (var i = 1; i <= _gameCount; i++)
         {
-            _pushTries = pushTries;
-            _teams = teams;
-            _gameCount = games;
-            _teamsPerPair = teamsPerPair;
-            _allowDuplicateLane = allowDuplicateLanes;
+            var game = GenerateGame(i, _games.ToArray());
 
-            if (_gameCount > _teams / (allowDuplicateLanes ? 1 :_teamsPerPair))
-                throw new InvalidOperationException("More games than pairs available");
-
-            _games = new List<Game>();
-        }
-
-        public bool Generate(Action<Game> dumpGame)
-        {
-            for (var i = 1; i <= _gameCount; i++)
+            if (game == null) // failed to generate a game
             {
-                var game = GenerateGame(i, _games.ToArray());
+                _games.Clear();
+                
+                return false;
+            }
 
-                if (game == null) // failed to generate a game
-                {
-                    _games.Clear();
-                    
-                    return false;
-                }
+            _games.Add(game);
+            dumpGame(game);
+        }
+        
+        return true;
+    }
 
-                _games.Add(game);
-                dumpGame(game);
+    private Game GenerateGame(int gameNumber, params Game[] previousGames)
+    {
+        bool differentLanesAndPairings;
+
+        var lanes = new List<Lane>();
+
+        ulong tries = 0;
+        
+        var timing = Stopwatch.StartNew();
+
+        do
+        {
+            if (tries++ == 1_000_000)
+            {
+                Console.WriteLine("Resetting after 1,000,000 tries");
+
+                return null;
+            }
+
+            if (tries % 10_000 == 0)
+            {
+                _pushTries(gameNumber, tries, timing.Elapsed);
+                timing.Restart();
+            }
+
+            differentLanesAndPairings = true;
+
+            var teams = RandomizeTeamOrder();
+
+            for (var i = 1; i <= _teams / _teamsPerPair; i++)
+            {
+                lanes.Add(new Lane(i));
             }
             
-            return true;
-        }
+            var laneAssignments = new List<Lane>();
 
-        private Game GenerateGame(int gameNumber, params Game[] previousGames)
-        {
-            bool differentLanesAndPairings;
-
-            var lanes = new List<Lane>();
-
-            ulong tries = 0;
-            
-            var timing = Stopwatch.StartNew();
-
-            do
+            foreach (var team in teams)
             {
-                if (tries++ == 1_000_000)
+                var previousPairs = previousGames.SelectMany(item => item.LaneAssignments).Where(item => item.Teams.Contains(team)).Select(item=>item.Number);
+
+                laneAssignments.Clear();
+
+                laneAssignments.AddRange(lanes.Where(item => item.Teams.Count != _teamsPerPair).Where(item=> _allowDuplicateLane || !previousPairs.Contains(item.Number))); //eligible lanes for assignment
+
+                if (laneAssignments.Count == 0)
+                    break;
+
+                do
                 {
-                    Console.WriteLine("Resetting after 1,000,000 tries");
+                    var tryLane = laneAssignments.GetRandom();
 
-                    return null;
-                }
+                    var previousTeamsOnLane = _allowDuplicateLane ? [] : previousGames.SelectMany(item => item.LaneAssignments)
+                        .Where(item => item.Number == tryLane.Number).SelectMany(item => item.Teams);
 
-                if (tries % 10_000 == 0)
-                {
-                    _pushTries(gameNumber, tries, timing.ElapsedMilliseconds);
-                    timing.Restart();
-                }
+                    var previousOpponents = previousGames.SelectMany(item => item.LaneAssignments)
+                        .Where(item => item.Teams.Contains(team)).SelectMany(item => item.Teams)
+                        .Where(item => item != team);
 
-                differentLanesAndPairings = true;
-
-                var teams = RandomizeTeamOrder().ToList();
-
-                for (var i = 1; i <= _teams / _teamsPerPair; i++)
-                {
-                    lanes.Add(new Lane(i));
-                }
-
-                foreach (var team in teams)
-                {
-                    var previousPairs = previousGames.SelectMany(item => item.LaneAssignments).Where(item => item.Teams.Contains(team)).Select(item=>item.Number);
-
-                    var laneAssignments = new List<Lane>();
-
-                    laneAssignments.AddRange(lanes.Where(item => item.Teams.Count != _teamsPerPair).Where(item=> _allowDuplicateLane || !previousPairs.Contains(item.Number))); //eligible lanes for assignment
-
-                    if (!laneAssignments.Any())
-                        break;
-
-                    do
+                    if (previousTeamsOnLane.Contains(team) || previousOpponents.Intersect(tryLane.Teams).Any())
                     {
-                        var tryLane = laneAssignments.GetRandom();
+                        laneAssignments.Remove(tryLane);
+                    }
+                    else
+                    {
+                        tryLane.AddTeam(team);
+                        laneAssignments.Clear();
+                    }
 
-                        var previousTeamsOnLane = _allowDuplicateLane ? Enumerable.Empty<int>() : previousGames.SelectMany(item => item.LaneAssignments)
-                            .Where(item => item.Number == tryLane.Number).SelectMany(item => item.Teams);
+                } while (laneAssignments.Count != 0);
+            }
 
-                        var previousOpponents = previousGames.SelectMany(item => item.LaneAssignments)
-                            .Where(item => item.Teams.Contains(team)).SelectMany(item => item.Teams)
-                            .Where(item => item != team);
+            if (lanes.All(item => item.Teams.Count == _teamsPerPair)) continue;
 
-                        if (previousTeamsOnLane.Contains(team) || previousOpponents.Intersect(tryLane.Teams).Any())
-                        {
-                            laneAssignments.Remove(tryLane);
-                        }
-                        else
-                        {
-                            tryLane.AddTeam(team);
-                            laneAssignments.Clear();
-                        }
+            differentLanesAndPairings = false;
+            lanes.Clear();
 
-                    } while (laneAssignments.Any());
-                }
+        } while (!differentLanesAndPairings);
 
-                if (lanes.All(item => item.Teams.Count == _teamsPerPair)) continue;
+        return new Game(gameNumber,tries, lanes.ToArray());
+    }
 
-                differentLanesAndPairings = false;
-                lanes.Clear();
+    private List<int> RandomizeTeamOrder()
+    {
+        var teams = new List<int>();
 
-            } while (!differentLanesAndPairings);
-
-            return new Game(gameNumber,tries, lanes.ToArray());
+        for (var i = 1; i <= _teams; i++)
+        {
+            teams.Add(i);
         }
 
-        private IEnumerable<int> RandomizeTeamOrder()
+        teams.Shuffle();
+
+        return teams;
+    }
+}
+
+internal static class GameGeneratorExtensions
+{
+    internal static Lane GetRandom(this IList<Lane> lanes)
+    {
+        if (lanes.Count == 1)
+            return lanes[0];
+        
+        var randomPosition = RandomNumberGenerator.GetInt32(0, lanes.Count - 1);
+
+        return lanes[randomPosition];
+    }
+
+    internal static void Shuffle<T>(this IList<T> list)
+    {
+        var rng = new Random(DateTime.Now.GetHashCode());
+
+        var n = list.Count;
+
+        while (n > 1)
         {
-            var teams = new List<int>();
-
-            for (var i = 1; i <= _teams; i++)
-                teams.Add(i);
-
-            teams.Shuffle();
-
-            return teams;
+            n--;
+            var k = rng.Next(n + 1);
+            (list[k], list[n]) = (list[n], list[k]);
         }
     }
 }

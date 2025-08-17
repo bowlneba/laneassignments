@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
 
 namespace LaneAssignments;
@@ -11,7 +12,7 @@ class Program
     private static int _teamsPerPair;
     private static bool _allowDuplicateLane;
 
-    private static List<Guid> _guids = [];
+    private static readonly List<Guid> Guids = [];
 
     static void Main(string[] args)
     {
@@ -29,14 +30,15 @@ class Program
 
         System.IO.Directory.CreateDirectory("results");
 
-        DynamicGames(Convert.ToInt32(teams),Convert.ToInt32(games),Convert.ToInt32(teamsPerPair), allowDuplicateLane.ToUpper() == "Y");
+        DynamicGames(Convert.ToInt32(teams),Convert.ToInt32(games),Convert.ToInt32(teamsPerPair), string.Equals(allowDuplicateLane, "Y", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void DynamicGames(int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
     {
         var success = false;
         var resetCount = 0;
-            
+
+        var stopwatch = Stopwatch.StartNew();
         // shell of a do while not success
         do
         {
@@ -63,13 +65,16 @@ class Program
                 System.IO.Directory.CreateDirectory("results//complete");
 
                 System.IO.File.WriteAllText($"results//complete//teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", x.ToString());
+                
+                stopwatch.Stop();
+                Console.WriteLine($"Total Time Elapsed: {stopwatch.Elapsed}");
             }
             else
             {
                 resetCount++;
                 Console.WriteLine($"Resetting all games and starting over - {resetCount}");
                     
-                foreach (var guid in _guids)
+                foreach (var guid in Guids)
                 {
                     var file = System.IO.Directory.GetFiles("results", $"*{guid}*.txt");
                     foreach (var f in file)
@@ -89,7 +94,7 @@ class Program
         Console.WriteLine(gameTxt);
             
         var guid = Guid.NewGuid();
-        _guids.Add(guid);
+        Guids.Add(guid);
             
         System.IO.File.WriteAllText($"results//game{game.Number}_teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{guid}.txt", gameTxt);
     }
@@ -118,6 +123,6 @@ class Program
         return x.ToString();
     }
 
-    private static void PushTries(int gameNumber, ulong tries, long elapsedMilliseconds)
-        => Console.WriteLine($"Game {gameNumber} Attempts: {tries:n0} Elapsed: {elapsedMilliseconds}ms");
+    private static void PushTries(int gameNumber, ulong tries, TimeSpan elapsed)
+        => Console.WriteLine($"Game {gameNumber} Attempts: {tries:n0} Elapsed: {elapsed}");
 }
