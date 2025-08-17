@@ -95,13 +95,13 @@ public class GameGeneratorDynamic2
 
         do
         {
-            if (Tries++ == 1_000_000)
+            if (Tries++ == 10_000_000)
             {
-                Console.WriteLine("Resetting after 1,000,000 tries");
+                Console.WriteLine("Resetting after 10,000,000 tries");
                 return null;
             }
 
-            if (Tries % 10_000 == 0)
+            if (Tries % 50_000 == 0)
             {
                 _pushTries(gameNumber, Tries, timing.Elapsed);
                 timing.Restart();

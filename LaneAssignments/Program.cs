@@ -232,7 +232,7 @@ async Task DynamicGames(int teams, int games, int teamsPerPair, bool allowDuplic
                 await System.IO.File.WriteAllTextAsync($"results/complete/teams{_teams}_games{_games}_perPair{_teamsPerPair}_duplicateLane-{_allowDuplicateLane}_{Guid.NewGuid()}.txt", x.ToString());
                 stopwatch.Stop();
                 Console.WriteLine($"Total Time Elapsed: {stopwatch.Elapsed}");
-                Console.WriteLine($"Total Attempts: {resetCount * 1_000_000 + generator.Tries:n0}"); 
+                Console.WriteLine($"Total Attempts: {resetCount * 10_000_000 + generator.Tries:n0}"); 
             }
         }
         else
