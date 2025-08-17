@@ -8,7 +8,7 @@ namespace LaneAssignments.Functionality;
 
 public class GameGeneratorDynamic
 {
-    private readonly Action<int, ulong, TimeSpan> _pushTries;
+    private readonly Action<int, int, TimeSpan> _pushTries;
     private readonly int _teams;
     private readonly int _gameCount;
     private readonly int _teamsPerPair;
@@ -17,7 +17,9 @@ public class GameGeneratorDynamic
     private readonly IList<Game> _games;
     public IEnumerable<Game> Games => _games;
 
-    public GameGeneratorDynamic(Action<int,ulong, TimeSpan> pushTries, int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
+    public int Tries { get; private set; }
+
+    public GameGeneratorDynamic(Action<int,int, TimeSpan> pushTries, int teams, int games, int teamsPerPair, bool allowDuplicateLanes)
     {
         _pushTries = pushTries;
         _teams = teams;
@@ -56,23 +58,21 @@ public class GameGeneratorDynamic
         bool differentLanesAndPairings;
 
         var lanes = new List<Lane>();
-
-        ulong tries = 0;
         
         var timing = Stopwatch.StartNew();
 
         do
         {
-            if (tries++ == 1_000_000)
+            if (Tries++ == 1_000_000)
             {
                 Console.WriteLine("Resetting after 1,000,000 tries");
 
                 return null;
             }
 
-            if (tries % 10_000 == 0)
+            if (Tries % 10_000 == 0)
             {
-                _pushTries(gameNumber, tries, timing.Elapsed);
+                _pushTries(gameNumber, Tries, timing.Elapsed);
                 timing.Restart();
             }
 
@@ -129,7 +129,7 @@ public class GameGeneratorDynamic
 
         } while (!differentLanesAndPairings);
 
-        return new Game(gameNumber,tries, lanes.ToArray());
+        return new Game(gameNumber,Tries, lanes.ToArray());
     }
 
     private List<int> RandomizeTeamOrder()
